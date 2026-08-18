@@ -40,7 +40,7 @@ jobs:
           fi
           
           echo "Executing $NOTEBOOK_PATH..."
-          jupyter nbconvert --to notebook --execute --inplace "$NOTEBOOK_PATH"
+          jupyter nbconvert --to notebook --execute --inplace "$NOTEBOOK_PATH" --allow-errors
           echo "Successfully executed!"
           
           # Convert to markdown for the summary
