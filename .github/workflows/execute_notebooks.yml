@@ -43,8 +43,16 @@ jobs:
           jupyter nbconvert --to notebook --execute --inplace "$NOTEBOOK_PATH"
           echo "Successfully executed!"
           
+          # Convert to markdown for the summary
+          jupyter nbconvert --to markdown "$NOTEBOOK_PATH"
+          MD_PATH="${NOTEBOOK_PATH%.ipynb}.md"
+          
+          echo "## Results for Week ${{ inputs.week }}" >> $GITHUB_STEP_SUMMARY
+          cat "$MD_PATH" >> $GITHUB_STEP_SUMMARY
+          
       - name: Upload executed notebook
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: executed-notebook-week-${{ inputs.week }}
           path: ${{ github.workspace }}/Week${{ inputs.week }}/*.ipynb
