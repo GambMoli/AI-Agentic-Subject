@@ -1,0 +1,50 @@
+name: Execute Weekly Exercises
+
+on:
+  workflow_dispatch:
+    inputs:
+      week:
+        description: 'Week number to execute (e.g., 1, 2, 3)'
+        required: true
+        type: string
+        default: '1'
+
+jobs:
+  run-exercises:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install jupyter nbconvert google-genai google-adk langchain-google-genai langgraph python-dotenv
+
+      - name: Execute notebook
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          # Finds the notebook for the given week folder
+          NOTEBOOK_PATH=$(find "Week${{ inputs.week }}" -name "week-0${{ inputs.week }}*.ipynb" -o -name "week-${{ inputs.week }}*.ipynb" | head -n 1)
+          
+          if [ -z "$NOTEBOOK_PATH" ]; then
+            echo "Error: Could not find a notebook for Week ${{ inputs.week }}"
+            exit 1
+          fi
+          
+          echo "Executing $NOTEBOOK_PATH..."
+          jupyter nbconvert --to notebook --execute --inplace "$NOTEBOOK_PATH"
+          echo "Successfully executed!"
+          
+      - name: Upload executed notebook
+        uses: actions/upload-artifact@v4
+        with:
+          name: executed-notebook-week-${{ inputs.week }}
+          path: ${{ github.workspace }}/Week${{ inputs.week }}/*.ipynb
