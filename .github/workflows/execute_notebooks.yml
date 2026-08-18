@@ -43,23 +43,25 @@ jobs:
           jupyter nbconvert --to notebook --execute --inplace "$NOTEBOOK_PATH" --allow-errors
           echo "Successfully executed!"
           
-          # Extract exercise results specifically to the summary
-          python -c "
-          import json, sys
-          try:
-              with open('$NOTEBOOK_PATH', 'r') as f:
-                  nb = json.load(f)
-              print('## Exercise Results')
-              for cell in nb.get('cells', []):
-                  if cell['cell_type'] == 'code':
-                      source = ''.join(cell.get('source', []))
-                      if 'TODO Exercise' in source:
-                          for out in cell.get('outputs', []):
-                              if out.get('output_type') == 'stream':
-                                  print('```text\n' + ''.join(out.get('text', [])) + '\n```\n')
-          except Exception as e:
-              print(f'Error generating summary: {e}')
-          " >> $GITHUB_STEP_SUMMARY
+          # Extract exercise results specifically to the summary using a python script
+          cat << 'EOF' > extract_results.py
+import json, sys
+try:
+    with open(sys.argv[1], 'r') as f:
+        nb = json.load(f)
+    print('## Exercise Results\n')
+    for cell in nb.get('cells', []):
+        if cell['cell_type'] == 'code':
+            source = ''.join(cell.get('source', []))
+            if 'TODO Exercise' in source:
+                for out in cell.get('outputs', []):
+                    if out.get('output_type') == 'stream':
+                        print('```text\n' + ''.join(out.get('text', [])) + '```\n')
+except Exception as e:
+    print(f'Error generating summary: {e}')
+EOF
+          
+          python extract_results.py "$NOTEBOOK_PATH" >> $GITHUB_STEP_SUMMARY
           
           # Also append the full markdown if desired, but the user requested explicit results.
           jupyter nbconvert --to markdown "$NOTEBOOK_PATH"
