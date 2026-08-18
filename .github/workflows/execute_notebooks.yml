@@ -26,53 +26,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install jupyter nbconvert google-genai google-adk langchain-google-genai langgraph python-dotenv
 
-      - name: Execute notebook
+      - name: Execute Python Exercises
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
-          # Finds the notebook for the given week folder
-          NOTEBOOK_PATH=$(find "Week${{ inputs.week }}" -name "week-0${{ inputs.week }}*.ipynb" -o -name "week-${{ inputs.week }}*.ipynb" | head -n 1)
+          WEEK_DIR="Week${{ inputs.week }}"
           
-          if [ -z "$NOTEBOOK_PATH" ]; then
-            echo "Error: Could not find a notebook for Week ${{ inputs.week }}"
+          if [ ! -d "$WEEK_DIR" ]; then
+            echo "Error: Directory $WEEK_DIR does not exist."
             exit 1
           fi
           
-          echo "Executing $NOTEBOOK_PATH..."
-          jupyter nbconvert --to notebook --execute --inplace "$NOTEBOOK_PATH" --allow-errors
-          echo "Successfully executed!"
+          echo "## Results for Week ${{ inputs.week }}" >> $GITHUB_STEP_SUMMARY
           
-          # Extract exercise results specifically to the summary using a python script
-          cat << 'EOF' > extract_results.py
-import json, sys
-try:
-    with open(sys.argv[1], 'r') as f:
-        nb = json.load(f)
-    print('## Exercise Results\n')
-    for cell in nb.get('cells', []):
-        if cell['cell_type'] == 'code':
-            source = ''.join(cell.get('source', []))
-            if 'TODO Exercise' in source:
-                for out in cell.get('outputs', []):
-                    if out.get('output_type') == 'stream':
-                        print('```text\n' + ''.join(out.get('text', [])) + '```\n')
-except Exception as e:
-    print(f'Error generating summary: {e}')
-EOF
+          # Find all python files named exercise*.py and execute them sequentially
+          for file in $(ls $WEEK_DIR/exercise*.py 2>/dev/null | sort); do
+            echo "Executing $file..."
+            echo "### File: $file" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            python "$file" >> $GITHUB_STEP_SUMMARY 2>&1
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          done
           
-          python extract_results.py "$NOTEBOOK_PATH" >> $GITHUB_STEP_SUMMARY
-          
-          # Also append the full markdown if desired, but the user requested explicit results.
-          jupyter nbconvert --to markdown "$NOTEBOOK_PATH"
-          MD_PATH="${NOTEBOOK_PATH%.ipynb}.md"
-          echo "<details><summary>Click to view full notebook execution</summary>" >> $GITHUB_STEP_SUMMARY
-          cat "$MD_PATH" >> $GITHUB_STEP_SUMMARY
-          echo "</details>" >> $GITHUB_STEP_SUMMARY
-          
-      - name: Upload executed notebook
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: executed-notebook-week-${{ inputs.week }}
-          path: ${{ github.workspace }}/Week${{ inputs.week }}/*.ipynb
+          echo "Successfully executed python exercises!"
