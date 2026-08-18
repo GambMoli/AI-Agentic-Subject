@@ -43,12 +43,30 @@ jobs:
           jupyter nbconvert --to notebook --execute --inplace "$NOTEBOOK_PATH" --allow-errors
           echo "Successfully executed!"
           
-          # Convert to markdown for the summary
+          # Extract exercise results specifically to the summary
+          python -c "
+          import json, sys
+          try:
+              with open('$NOTEBOOK_PATH', 'r') as f:
+                  nb = json.load(f)
+              print('## Exercise Results')
+              for cell in nb.get('cells', []):
+                  if cell['cell_type'] == 'code':
+                      source = ''.join(cell.get('source', []))
+                      if 'TODO Exercise' in source:
+                          for out in cell.get('outputs', []):
+                              if out.get('output_type') == 'stream':
+                                  print('```text\n' + ''.join(out.get('text', [])) + '\n```\n')
+          except Exception as e:
+              print(f'Error generating summary: {e}')
+          " >> $GITHUB_STEP_SUMMARY
+          
+          # Also append the full markdown if desired, but the user requested explicit results.
           jupyter nbconvert --to markdown "$NOTEBOOK_PATH"
           MD_PATH="${NOTEBOOK_PATH%.ipynb}.md"
-          
-          echo "## Results for Week ${{ inputs.week }}" >> $GITHUB_STEP_SUMMARY
+          echo "<details><summary>Click to view full notebook execution</summary>" >> $GITHUB_STEP_SUMMARY
           cat "$MD_PATH" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
           
       - name: Upload executed notebook
         uses: actions/upload-artifact@v4
